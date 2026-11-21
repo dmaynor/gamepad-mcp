@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gamepad-mcp"
-version = "0.1.2"
+version = "0.2.0"
 description = "Scriptable gamepad for AI agents: an MCP server that plays games by posting real HID keyboard/mouse events (Chiaki/PS Remote Play and any keyboard-driven game)."
 readme = "README.md"
 license = "Apache-2.0"
@@ -14,10 +14,12 @@ authors = [{ name = "David Maynor" }]
 
 [project.optional-dependencies]
 macos = ["pyobjc-framework-Quartz>=10", "pyobjc-framework-ApplicationServices>=10"]
+driver = ["Pillow>=10"]
 test = ["pytest>=8"]
 
 [project.scripts]
 gamepad-mcp = "gamepad_mcp.server:main"
+gamepad-driver = "gamepad_mcp.driver:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

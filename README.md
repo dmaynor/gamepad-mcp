@@ -79,6 +79,33 @@ MCP client config (stdio):
 | `mouse_move(x, y)` / `mouse_click(button, hold_ms)` | Absolute pointer control |
 | `profiles` / `set_profile(name)` | Keymap management |
 
+## The driver: a reflex layer that takes steering commands
+
+An agent calling these tools one at a time plays at ~1 move per minute —
+too slow for any game (measured live, 2026-11-21: cars drove off
+mid-thought). `gamepad-driver` is the fast layer underneath the agent:
+it runs next to the server, closes the loop at 5 Hz, and takes
+*steering commands* from the planner:
+
+```sh
+pip install 'gamepad-mcp[driver,macos]'
+gamepad-driver --frames mac \
+    --server-url http://<tailscale-ip>:8765/mcp --server-token <token>
+
+curl -X POST localhost:8771/command -d '{"mode": "waypoint", "ttl_s": 120}'
+curl localhost:8771/status
+curl -X POST localhost:8771/command -d '{"mode": "stop"}'
+```
+
+Its one skill is GTA navigation: crop the minimap, find the teal
+waypoint pin, steer the left stick by the pin's bearing (the minimap is
+player-up, so the bearing is relative to the character's facing; the
+stick is steered incrementally, no world frame needed). `forward` mode
+just walks ahead. Commands carry a TTL and auto-stop; losing the pin
+for ~3 s stops too; every stop calls `release_all`. Each tick is
+logged as JSONL, and `--save-frames` also writes the frame per tick —
+an aligned (frame → input) dataset for training a learned driver.
+
 ## Safety model
 
 - Every key-down is paired with a scheduled key-up. Holds default to a
