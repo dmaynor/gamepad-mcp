@@ -1,8 +1,9 @@
-# gamepad-mcp 0.1.2 source-tree manifest — 2026-11-21T16:31:59Z
-# MANIFEST.sha256 itself is not listed (self-reference). Regenerated for the GitHub push; README operational docs (Chiaki-UCR setup/launch recipe, focus law, known issues) added after the 0.1.2 tarball are included, code is unchanged from 0.1.2.
+# gamepad-mcp 0.1.2 source-tree manifest — 2026-11-21T16:36:36Z
+# MANIFEST.sha256 itself is not listed (self-reference). Includes the Chiaki-UCR operational docs and the 2026-11-21 verified gameplay screenshot; code is unchanged from 0.1.2.
 a08e720265df6994b0c479ae4802efd79a4cef78ef8da79f97537cbbc23e9d0e       59  .gitignore
 cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30    11358  LICENSE
-c189ab782bb058af77e231aa5f15700a98609ca13b84582bed3b3082479fc8b6     8261  README.md
+af17d67f9369330b855e290ae97e445553bbd4bd80c4d532cda0e5eeca9fda0a     8672  README.md
+336d749fad18c05e5f7c5e854f1fa4d001c7bb7e53df0434370f23d15419292b   237177  docs/images/muse-playing-gta-vi-2026-11-21.jpg
 0eef7ddb41fe54a1327be384dbcb0eddcc7234b4a1de595ba8e8c8924b7baad4     1905  install.sh
 1c4130e87f7cff93b966cd894c9730199079f558108b90d81177dc4ff3d85ed8      754  keymaps/chiaki-ng.json
 402a8da3e1c8c7140d898bfbd9a4149c636a513cd976dae94d4b25b6ecae71ac     1156  launchd/com.gamepadmcp.server.plist

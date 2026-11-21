@@ -110,6 +110,12 @@ keyboard side, so the chain is agent → HID keys → UCR → virtual DualSense 
 console. Two one-time setup steps and one launch order make it work;
 skipping any of them fails silently.
 
+![Muse playing GTA VI on a PS5 through gamepad-mcp and Chiaki-UCR — Jason on the deck of his house, UCR's "TECLADO ACTIVO" banner at bottom left](docs/images/muse-playing-gta-vi-2026-11-21.jpg)
+
+*Verified live on 2026-11-21: an agent driving GTA VI on a PS5 through this
+chain — buttons first (Circle closed Jason's in-game phone), then sticks
+(a 10-second `hold_stick` walked Jason to the deck railing).*
+
 ### One-time setup: let the plugin load
 
 chiaki-ng 1.10.1's executable is hardened-runtime signed (CodeDirectory
