@@ -1,10 +1,10 @@
-# gamepad-mcp 0.2.0 source-tree manifest — 2026-11-21T17:30:04Z
-# MANIFEST.sha256 itself is not listed (self-reference). 0.2.0 adds gamepad-driver: the 5 Hz reflex layer that takes steering commands and steers by the GTA minimap waypoint (src/gamepad_mcp/driver.py, tests/test_driver.py).
+# gamepad-mcp 0.2.0 source-tree manifest — 2026-11-21T17:35:00Z
+# MANIFEST.sha256 itself is not listed (self-reference). 0.2.0 adds gamepad-driver (src/gamepad_mcp/driver.py); install.sh now installs the driver extra on macOS and links the gamepad-driver binary.
 a08e720265df6994b0c479ae4802efd79a4cef78ef8da79f97537cbbc23e9d0e         59  .gitignore
 cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30      11358  LICENSE
 6d68918d5031376910c758a6e770d9e7ea56dc2f2ddc5fdd15ded0fd416f2c6e      10292  README.md
 336d749fad18c05e5f7c5e854f1fa4d001c7bb7e53df0434370f23d15419292b     237177  docs/images/muse-playing-gta-vi-2026-11-21.jpg
-0eef7ddb41fe54a1327be384dbcb0eddcc7234b4a1de595ba8e8c8924b7baad4       1905  install.sh
+37b51c104068cf0852856bd0df595a0f799ecd393de1a0386e8d5b1fb9e541a6       2284  install.sh
 1c4130e87f7cff93b966cd894c9730199079f558108b90d81177dc4ff3d85ed8        754  keymaps/chiaki-ng.json
 402a8da3e1c8c7140d898bfbd9a4149c636a513cd976dae94d4b25b6ecae71ac       1156  launchd/com.gamepadmcp.server.plist
 6f149bf30c05d99b698429286f0468957b44d72db076802703b456973dfa951c        814  pyproject.toml

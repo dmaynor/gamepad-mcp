@@ -21,7 +21,10 @@ fi
 
 EXTRA=""
 if [ "$(uname -s)" = "Darwin" ]; then
-  EXTRA="[macos]"
+  # macos: input backend + window capture; driver: the reflex layer
+  # (Pillow for minimap vision). The driver is a Mac-side tool — it
+  # runs next to the server — so it ships with the macOS install.
+  EXTRA="[macos,driver]"
 fi
 "$PREFIX/venv/bin/pip" install --quiet --upgrade pip
 "$PREFIX/venv/bin/pip" install --quiet "$SRC_DIR$EXTRA"
@@ -31,6 +34,10 @@ mkdir -p "$HOME/.config/gamepad-mcp/keymaps"
 cp "$SRC_DIR"/keymaps/*.json "$HOME/.config/gamepad-mcp/keymaps/" 2>/dev/null || true
 
 ln -sf "$PREFIX/venv/bin/gamepad-mcp" "$BIN_DIR/gamepad-mcp"
+if [ -x "$PREFIX/venv/bin/gamepad-driver" ]; then
+  ln -sf "$PREFIX/venv/bin/gamepad-driver" "$BIN_DIR/gamepad-driver"
+  echo "installed: $BIN_DIR/gamepad-driver"
+fi
 
 echo "installed: $BIN_DIR/gamepad-mcp"
 case ":$PATH:" in
