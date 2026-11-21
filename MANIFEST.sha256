@@ -1,5 +1,5 @@
-# gamepad-mcp 0.1.2 source-tree manifest — 2026-11-21T16:45:03Z
-# MANIFEST.sha256 itself is not listed (self-reference). Adds --public mode (IPv4 masking in log output) on top of the Chiaki-UCR operational docs and the 2026-11-21 verified gameplay screenshot.
+# gamepad-mcp 0.1.2 source-tree manifest — 2026-11-21T16:48:16Z
+# MANIFEST.sha256 itself is not listed (self-reference). --public mode fix: the IP mask filter now preserves record.args (uvicorn AccessFormatter unpacks them); regression-tested through the real formatter.
 a08e720265df6994b0c479ae4802efd79a4cef78ef8da79f97537cbbc23e9d0e         59  .gitignore
 cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30      11358  LICENSE
 501d1be885d95dded811d69dc3e0836d38a1f995c4bd7355985afe0d334031a4       9053  README.md
@@ -16,8 +16,8 @@ d9535b403e25082e9c762ca5cb52ea4a28c752b4e0011caf9207d35b6cf887fc        569  src
 ddcc7038257efefc88b8f04c0c36d9544476dbc76b64613eeb96fc32befbcb3f       4249  src/gamepad_mcp/controller.py
 459753a20bf3f13dc713560adc531090232b2ae4a582dc1e49f2ec0f51317e29       1391  src/gamepad_mcp/keycodes.py
 5419aef4e276fd82a0599b893899c13d38ddfd9ff61f5b54066a61eaa3028781       3023  src/gamepad_mcp/keymaps.py
-cbf57e8769de37b56b44952ffc1b72f33ddfed876be1ab2f8e5c28fa9f339182       8319  src/gamepad_mcp/server.py
+4b73845759e2ea772ea4eae8a2d6c6018440c17f59ba860ab4c12767dfda3a68       9071  src/gamepad_mcp/server.py
 dd61c4650c31b6ce176c86cfbc36eaffb3947ee054fa61ea52b99370b062d3a0       1710  tests/test_controller.py
 aaf866743361369d7a8096afabf879094b4ccc595c2d305d4a85a6ae182c9522       1138  tests/test_keymaps.py
-ea01f7dcd32bfee4e1efd062d56cc40f0fe36e58f5fc09195dd9b70262e0c12d       2123  tests/test_public_mask.py
+ec192df9bf7721e8894e07d0690bd50b3f916c6aa92d2483b00b1f1cef9a94fd       2863  tests/test_public_mask.py
 302b523eb662078b44af3badd9dccfd5406fb2f721c842d0286495fecc195002       1904  tests/test_server_smoke.py

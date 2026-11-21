@@ -52,6 +52,25 @@ def test_filter_handles_format_args():
     assert record.getMessage() == "XXX.XXX.XXX.113:51234 - request"
 
 
+def test_filter_preserves_uvicorn_access_args():
+    """Regression (live failure 2026-11-21): uvicorn's AccessFormatter
+    unpacks record.args as a 5-tuple. The filter must mask the client
+    address in place and leave the tuple structure — and the formatted
+    output — intact."""
+    from uvicorn.logging import AccessFormatter
+
+    record = logging.LogRecord(
+        "uvicorn.access", logging.INFO, __file__, 1,
+        '%s - "%s %s HTTP/%s" %d',
+        ("100.105.169.113:50016", "POST", "/mcp", "1.1", 200), None,
+    )
+    assert PublicIPMaskFilter().filter(record) is True
+    assert len(record.args) == 5
+    out = AccessFormatter().format(record)
+    assert "XXX.XXX.XXX.113:50016" in out
+    assert "100.105" not in out
+
+
 def test_public_log_config_wires_filter_into_handlers():
     config = public_log_config()
     assert config["filters"]["public_ip"]["()"].endswith("PublicIPMaskFilter")

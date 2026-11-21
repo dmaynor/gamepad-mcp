@@ -45,14 +45,30 @@ def mask_ips(text: str) -> str:
 
 
 class PublicIPMaskFilter(logging.Filter):
-    """Logging filter for public mode: rewrites each record's message
-    through mask_ips before it is formatted."""
+    """Logging filter for public mode: masks IPv4 addresses in each
+    record before it is formatted.
+
+    The mask is applied to the record's args (and to the message itself
+    only when there are no args), NEVER by flattening args into the
+    message: uvicorn's AccessFormatter unpacks record.args as a 5-tuple
+    (client, method, path, version, status), and flattening args to ()
+    crashes it on every access-log line (shipped bug, caught live
+    2026-11-21; regression-tested in tests/test_public_mask.py)."""
 
     def filter(self, record: logging.LogRecord) -> bool:
-        masked = mask_ips(record.getMessage())
-        if masked != record.getMessage():
-            record.msg = masked
-            record.args = ()
+        if record.args:
+            if isinstance(record.args, dict):
+                record.args = {
+                    k: mask_ips(v) if isinstance(v, str) else v
+                    for k, v in record.args.items()
+                }
+            else:
+                record.args = tuple(
+                    mask_ips(a) if isinstance(a, str) else a
+                    for a in record.args
+                )
+        elif isinstance(record.msg, str):
+            record.msg = mask_ips(record.msg)
         return True
 
 
