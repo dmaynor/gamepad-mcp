@@ -26,10 +26,22 @@ class MacOSBackend(InputBackend):
                 "install with: pip install 'gamepad-mcp[macos]'"
             ) from exc
         self._q = Quartz
+        # An explicit HID-system event source is load-bearing: with a
+        # None source, events created on a non-main thread (the MCP
+        # server runs tool calls on worker threads) are silently
+        # dropped by the window server, while the identical call from
+        # a process's main thread works. Verified live 2026-11-21:
+        # main-thread snippet typed, server-posted keys vanished.
+        try:
+            self._source = Quartz.CGEventSourceCreate(
+                Quartz.kCGEventSourceStateHIDSystemState
+            )
+        except Exception:
+            self._source = None
 
     def _post_key(self, key: str, down: bool) -> None:
         q = self._q
-        event = q.CGEventCreateKeyboardEvent(None, keycode(key), down)
+        event = q.CGEventCreateKeyboardEvent(self._source, keycode(key), down)
         q.CGEventPost(q.kCGHIDEventTap, event)
 
     def key_down(self, key: str) -> None:
@@ -40,7 +52,7 @@ class MacOSBackend(InputBackend):
 
     def _mouse_event(self, event_type, x: int, y: int, button) -> None:
         q = self._q
-        event = q.CGEventCreateMouseEvent(None, event_type, (x, y), button)
+        event = q.CGEventCreateMouseEvent(self._source, event_type, (x, y), button)
         q.CGEventPost(q.kCGHIDEventTap, event)
 
     def mouse_move(self, x: int, y: int) -> None:

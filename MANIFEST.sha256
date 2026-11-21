@@ -1,13 +1,14 @@
-# gamepad-mcp 0.1.0 verification manifest — 2026-11-21T14:55:57Z
-# tarball: dist/gamepad-mcp-0.1.0.tar.gz 15526 bytes sha256 4a5cab7ffbee18098fda853b10b93f1bb52ec7ef55070c69213425fb227925ef
+# gamepad-mcp 0.1.1 verification manifest — 2026-11-21T15:01:10Z
+# tarball: dist/gamepad-mcp-0.1.1.tar.gz 17113 bytes sha256 695c4182e363ef0ceaf2a417c51e30f5733e3af0558ff92521353ee9329c8525
 a08e720265df6994b0c479ae4802efd79a4cef78ef8da79f97537cbbc23e9d0e        59  .gitignore
 cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30     11358  LICENSE
+64d34387973ab72294cdd9509aaec0c5c367183d8b525b8bdd116f984d1d00b8       363  MANIFEST.sha256
 bafcc8169ab02c703d707568817f648fe98f21e94f974f621f514a4a9bf7fd4e      4064  README.md
 0eef7ddb41fe54a1327be384dbcb0eddcc7234b4a1de595ba8e8c8924b7baad4      1905  install.sh
 1c4130e87f7cff93b966cd894c9730199079f558108b90d81177dc4ff3d85ed8       754  keymaps/chiaki-ng.json
 402a8da3e1c8c7140d898bfbd9a4149c636a513cd976dae94d4b25b6ecae71ac      1156  launchd/com.gamepadmcp.server.plist
-37fb2685d1a9939e7c4e3e4b7661f07af6333b8cfbec6214887e266cd7a08bde       747  pyproject.toml
-53d3783022f421b1892b42beef6cbfd2f96d0a690bcdc569f0e4b9b6f251808c        91  src/gamepad_mcp/__init__.py
+d3578ef886e9d286e75a06099f7324350904b0d59b9ed83b6d14a9b4dc29a910       747  pyproject.toml
+43554a7026aeba2714bcfb985efaf97fa97ce77c5ac8811947998d26943f4ab1        91  src/gamepad_mcp/__init__.py
 d9535b403e25082e9c762ca5cb52ea4a28c752b4e0011caf9207d35b6cf887fc       569  src/gamepad_mcp/backends/__init__.py
 01fecce8678b46a17ca9929270ffc5cd92565d3acfe0dc670d675575318c08c8      1056  src/gamepad_mcp/backends/base.py
 ade236f9c44817509e7404346d534314bd5908a4919b23b4c6c2253f499d032e      2359  src/gamepad_mcp/backends/macos.py
@@ -15,7 +16,7 @@ ade236f9c44817509e7404346d534314bd5908a4919b23b4c6c2253f499d032e      2359  src/
 ddcc7038257efefc88b8f04c0c36d9544476dbc76b64613eeb96fc32befbcb3f      4249  src/gamepad_mcp/controller.py
 459753a20bf3f13dc713560adc531090232b2ae4a582dc1e49f2ec0f51317e29      1391  src/gamepad_mcp/keycodes.py
 5419aef4e276fd82a0599b893899c13d38ddfd9ff61f5b54066a61eaa3028781      3023  src/gamepad_mcp/keymaps.py
-6163b64191ca9fa9b51ab9a4582719183839dec7b83fd410023416d827708943      5459  src/gamepad_mcp/server.py
+3867a677b888b9367412dc9236aeb89648c65030e52e809c3d2aab2ccef4e5e4      6052  src/gamepad_mcp/server.py
 dd61c4650c31b6ce176c86cfbc36eaffb3947ee054fa61ea52b99370b062d3a0      1710  tests/test_controller.py
 aaf866743361369d7a8096afabf879094b4ccc595c2d305d4a85a6ae182c9522      1138  tests/test_keymaps.py
 302b523eb662078b44af3badd9dccfd5406fb2f721c842d0286495fecc195002      1904  tests/test_server_smoke.py
