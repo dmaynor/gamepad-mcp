@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Optional launchd agent: keeps gamepad-mcp serving HTTP on loopback.
+     Install:  sed the paths, then
+       cp launchd/com.gamepadmcp.server.plist ~/Library/LaunchAgents/
+       launchctl load ~/Library/LaunchAgents/com.gamepadmcp.server.plist
+     For a remote agent, change --host to this machine's Tailscale IP and
+     set a real --token. Never bind 0.0.0.0 without a token. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.gamepadmcp.server</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/YOURNAME/.local/bin/gamepad-mcp</string>
+    <string>--http</string>
+    <string>--host</string>
+    <string>127.0.0.1</string>
+    <string>--port</string>
+    <string>8765</string>
+    <string>--token</string>
+    <string>CHANGE-ME</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/tmp/gamepad-mcp.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/gamepad-mcp.log</string>
+</dict>
+</plist>
