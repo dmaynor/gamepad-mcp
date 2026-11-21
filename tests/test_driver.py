@@ -82,8 +82,54 @@ def test_law_steers_toward_bearing():
     assert law.decide(sight_at(40), "waypoint")[0] == "up-right"
     # now moving up-right (45); target dead ahead -> keep up-right
     assert law.decide(sight_at(0), "waypoint")[0] == "up-right"
-    # target 90 left of heading -> 45-90 = -45 -> up-left
-    assert law.decide(sight_at(-90), "waypoint")[0] == "up-left"
+    # target 90 left of heading: the stick turns at most one cell per
+    # tick, so it passes through up on the way to up-left
+    assert law.decide(sight_at(-90), "waypoint")[0] == "up"
+    assert law.decide(sight_at(-45), "waypoint")[0] == "up-left"
+
+
+def test_law_converges_with_a_turning_character():
+    # Regression (first live test, 2026-11-21): the old full-error law
+    # cycled the stick through all 8 directions against a constant
+    # +113.6 deg bearing. With a plant that turns toward the stick at
+    # a capped rate, the capped-step law must converge to the target
+    # heading (within one quantization cell) and never stop.
+    law = SteeringLaw()
+    target = 113.6
+    heading = 0.0
+    dirs = []
+    for _ in range(12):
+        bearing = (target - heading + 180) % 360 - 180
+        action = law.decide(sight_at(bearing), "waypoint")
+        assert action is not None
+        dirs.append(action[0])
+        diff = (law.stick_deg - heading + 180) % 360 - 180
+        heading += max(-30.0, min(30.0, diff))
+    final_bearing = (target - heading + 180) % 360 - 180
+    assert abs(final_bearing) < 25
+    assert dirs[-1] == "down-right"  # settled on the target's cell
+    assert len(set(dirs)) <= 4  # no all-directions spin
+
+
+def test_law_stuck_bearing_stops():
+    # A large bearing that never closes means the character is not
+    # responding (wall, fence): stop and say why instead of grinding.
+    law = SteeringLaw()
+    action = None
+    for _ in range(30):
+        action = law.decide(sight_at(113.6), "waypoint")
+        if action is None:
+            break
+    assert action is None
+    assert law.stop_reason == "stuck: bearing not closing"
+
+
+def test_law_closing_bearing_never_trips_stuck():
+    # A bearing that shrinks each tick (the character is turning)
+    # must never read as stuck, even while it is still large.
+    law = SteeringLaw()
+    for bearing in (150, 130, 110, 90, 70, 55, 40, 25, 10, 0, 0):
+        assert law.decide(sight_at(bearing), "waypoint") is not None
 
 
 def test_law_forward_mode():

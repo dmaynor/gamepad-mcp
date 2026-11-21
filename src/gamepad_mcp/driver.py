@@ -18,8 +18,10 @@ against a gamepad-mcp server, closing the loop on every tick:
   2. crop the minimap, find the teal waypoint pin, measure its bearing
      relative to the player (the minimap is player-up, so the bearing
      is relative to the character's facing)
-  3. steer: new stick direction = current movement direction + bearing
-     error, quantized to the 8 stick directions, pulsed for one tick
+  3. steer: move the stick toward (current movement direction +
+     bearing error) by at most one 45-degree cell per tick, quantized
+     to the 8 stick directions, pulsed for one tick; stop if a large
+     bearing stops closing (stuck) or the pin stays lost
 
 No world frame is needed anywhere: everything is relative, and the loop
 re-senses 5x per second, so errors correct themselves the way they do
@@ -157,6 +159,10 @@ DIRECTIONS = [
 ]
 PULSE_MS = 240        # one tick of stick per decision
 LOST_LIMIT = 15       # ticks without a sighting (~3 s at 5 Hz) -> stop
+MAX_STEP_DEG = 45.0   # per-tick cap on stick-angle change (one cell)
+STUCK_TICKS = 20      # ~4 s of non-closing large bearing -> stop
+STUCK_BEARING = 60.0  # bearing counts as "large" for stuck detection
+STUCK_EPS = 10.0      # bearing counts as unchanged within this band
 
 
 def quantize(deg: float) -> tuple:
@@ -170,36 +176,69 @@ class SteeringLaw:
 
     The stick is camera-relative and the character turns to face his
     movement direction, so while moving, heading == last stick angle.
-    The minimap reports the target relative to heading, hence:
-        new stick angle = last stick angle + bearing error.
+    The minimap reports the target relative to heading, hence the stick
+    should move toward (last stick angle + bearing error) — but only by
+    a capped step per tick. The first live test (2026-11-21) added the
+    full error every tick against a character whose turn rate is far
+    slower than the pulse rate: the measured error never shrank while
+    the commanded angle integrated it, and the stick spun through all
+    8 directions in a limit cycle. A capped proportional step cannot
+    wind up: the command each tick derives from the current measured
+    error, bounded to one quantization cell.
+
+    Stuck detection: a large bearing that stays large while moving
+    means the plant is not responding (a wall, a fence, deep water).
+    Steering harder cannot fix that, so the law stops and says why.
     """
 
     def __init__(self):
         self.stick_deg = 0.0
         self.lost_ticks = 0
         self.moving = False
+        self.stop_reason = "waypoint lost"
+        self._stuck_ticks = 0
+        self._last_bearing = None
 
     def reset(self):
         self.stick_deg = 0.0
         self.lost_ticks = 0
         self.moving = False
+        self.stop_reason = "waypoint lost"
+        self._stuck_ticks = 0
+        self._last_bearing = None
 
     def decide(self, sight: Sight, mode: str) -> tuple | None:
         """Returns (direction, hold_ms), or None to stop."""
         if mode == "forward":
             self.stick_deg = 0.0
             self.moving = True
+            self._stuck_ticks = 0
+            self._last_bearing = None
             return ("up", PULSE_MS)
         # mode == "waypoint"
         if not sight.found:
             self.lost_ticks += 1
+            self._stuck_ticks = 0
+            self._last_bearing = None
             if self.lost_ticks > LOST_LIMIT or not self.moving:
+                self.stop_reason = "waypoint lost"
                 return None
             name, _ = quantize(self.stick_deg)
             return (name, PULSE_MS)
         self.lost_ticks = 0
         self.moving = True
-        name, snapped = quantize(self.stick_deg + sight.bearing_deg)
+        err = sight.bearing_deg
+        if (abs(err) > STUCK_BEARING and self._last_bearing is not None
+                and abs(err - self._last_bearing) <= STUCK_EPS):
+            self._stuck_ticks += 1
+            if self._stuck_ticks >= STUCK_TICKS:
+                self.stop_reason = "stuck: bearing not closing"
+                return None
+        else:
+            self._stuck_ticks = 0
+        self._last_bearing = err
+        step = max(-MAX_STEP_DEG, min(MAX_STEP_DEG, err))
+        name, snapped = quantize(self.stick_deg + step)
         self.stick_deg = snapped
         return (name, PULSE_MS)
 
@@ -518,9 +557,9 @@ class Driver:
         if action is None:
             self._release()
             with self._lock:
-                self.state.note = "stopped: waypoint lost"
+                self.state.note = f"stopped: {self.law.stop_reason}"
                 self.state.command = Command("stop", 0.0)
-            record["note"] = "auto-stop: sight lost"
+            record["note"] = f"auto-stop: {self.law.stop_reason}"
         else:
             direction, hold_ms = action
             self._act(direction, hold_ms)

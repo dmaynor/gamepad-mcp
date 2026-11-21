@@ -1,25 +1,26 @@
-# gamepad-mcp 0.2.0 source-tree manifest — 2026-11-21T17:35:00Z
-# MANIFEST.sha256 itself is not listed (self-reference). 0.2.0 adds gamepad-driver (src/gamepad_mcp/driver.py); install.sh now installs the driver extra on macOS and links the gamepad-driver binary.
+# gamepad-mcp 0.2.1 source-tree manifest — 2026-11-21T17:47:57Z
+# MANIFEST.sha256 itself is not listed (self-reference). 0.2.1 fixes the driver steering law (capped one-cell step per tick + stuck stop) after the first live test spun the stick, and adds launchd/com.gamepadmcp.driver.plist (the driver needs a LaunchAgent so macOS grants it Screen Recording).
 a08e720265df6994b0c479ae4802efd79a4cef78ef8da79f97537cbbc23e9d0e         59  .gitignore
 cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30      11358  LICENSE
-6d68918d5031376910c758a6e770d9e7ea56dc2f2ddc5fdd15ded0fd416f2c6e      10292  README.md
+d91f2da41cf916c29dc16c82120b8b20cb15b2e6b9f9f5c2cb1b8f31536dc35f      10562  README.md
 336d749fad18c05e5f7c5e854f1fa4d001c7bb7e53df0434370f23d15419292b     237177  docs/images/muse-playing-gta-vi-2026-11-21.jpg
 37b51c104068cf0852856bd0df595a0f799ecd393de1a0386e8d5b1fb9e541a6       2284  install.sh
 1c4130e87f7cff93b966cd894c9730199079f558108b90d81177dc4ff3d85ed8        754  keymaps/chiaki-ng.json
+d4adfc8421da19a6624ae38b0b39ac6e60572fb1bd62fa7a5154782f21abacdf       1894  launchd/com.gamepadmcp.driver.plist
 402a8da3e1c8c7140d898bfbd9a4149c636a513cd976dae94d4b25b6ecae71ac       1156  launchd/com.gamepadmcp.server.plist
-6f149bf30c05d99b698429286f0468957b44d72db076802703b456973dfa951c        814  pyproject.toml
+d642dfe304fedbdc9e167cde24ad4432a5e053e56fe11383a6a1d6a6f8faa347        814  pyproject.toml
 f98097619d60fd5764cb845f6ab3f45af189bf8bf12bf35312801072107a1915         91  src/gamepad_mcp/__init__.py
 d9535b403e25082e9c762ca5cb52ea4a28c752b4e0011caf9207d35b6cf887fc        569  src/gamepad_mcp/backends/__init__.py
 01fecce8678b46a17ca9929270ffc5cd92565d3acfe0dc670d675575318c08c8       1056  src/gamepad_mcp/backends/base.py
 699f20153e431397ddd2979fa2cdbe83c95c27e5f0fbab1de6570f9fc344252d       2978  src/gamepad_mcp/backends/macos.py
 19b8e85dd2c8b272baa08f6a28fa8f552f6a177e581f602c42dac8b3e4db4feb        978  src/gamepad_mcp/backends/null.py
 ddcc7038257efefc88b8f04c0c36d9544476dbc76b64613eeb96fc32befbcb3f       4249  src/gamepad_mcp/controller.py
-4cfc806a731348d568d863128ce1c8ca7b3cca30b7f39961ff8f5c749a86303a      24551  src/gamepad_mcp/driver.py
+3aa24bdce3cdd159cae47dfa68543bd681fad4e67bd495d11863445a1dc80e75      26540  src/gamepad_mcp/driver.py
 459753a20bf3f13dc713560adc531090232b2ae4a582dc1e49f2ec0f51317e29       1391  src/gamepad_mcp/keycodes.py
 5419aef4e276fd82a0599b893899c13d38ddfd9ff61f5b54066a61eaa3028781       3023  src/gamepad_mcp/keymaps.py
 4b73845759e2ea772ea4eae8a2d6c6018440c17f59ba860ab4c12767dfda3a68       9071  src/gamepad_mcp/server.py
 dd61c4650c31b6ce176c86cfbc36eaffb3947ee054fa61ea52b99370b062d3a0       1710  tests/test_controller.py
-e96c43c70648c9687af9ab2e30a1206272035a6c3c9e075eaa68100fa7202dcd       5766  tests/test_driver.py
+9c93ab6218fb4093ebf26b491dcbd69fe0f942ed9bc2197af1582b4a065fb313       7655  tests/test_driver.py
 aaf866743361369d7a8096afabf879094b4ccc595c2d305d4a85a6ae182c9522       1138  tests/test_keymaps.py
 ec192df9bf7721e8894e07d0690bd50b3f916c6aa92d2483b00b1f1cef9a94fd       2863  tests/test_public_mask.py
 302b523eb662078b44af3badd9dccfd5406fb2f721c842d0286495fecc195002       1904  tests/test_server_smoke.py

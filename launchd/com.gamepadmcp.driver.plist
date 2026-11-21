@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Optional launchd agent: runs gamepad-driver in the GUI session.
+
+     Why launchd and not a shell: the driver captures the game window
+     with screencapture, and macOS TCC denies screen capture to
+     SSH-launched processes outright ("could not create image from
+     display", verified 2026-11-21). A LaunchAgent runs in the user's
+     GUI session, where the Python binary can hold a Screen Recording
+     grant (System Settings -> Privacy & Security -> Screen Recording).
+
+     Install:  sed the paths/token, then
+       cp launchd/com.gamepadmcp.driver.plist ~/Library/LaunchAgents/
+       launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gamepadmcp.driver.plist
+     For a remote planner, change --host to this machine's Tailscale IP
+     and set a real --token. Never bind 0.0.0.0 without a token. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.gamepadmcp.driver</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/YOURNAME/.local/bin/gamepad-driver</string>
+    <string>--frames</string>
+    <string>mac</string>
+    <string>--server-url</string>
+    <string>http://127.0.0.1:8765/mcp</string>
+    <string>--server-token</string>
+    <string>CHANGE-ME</string>
+    <string>--host</string>
+    <string>127.0.0.1</string>
+    <string>--port</string>
+    <string>8771</string>
+    <string>--token</string>
+    <string>CHANGE-ME</string>
+    <string>--save-frames</string>
+    <string>/Users/YOURNAME/gamepad-driver-frames</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <false/>
+  <key>StandardOutPath</key>
+  <string>/Users/YOURNAME/gamepad-driver.out</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/YOURNAME/gamepad-driver.out</string>
+</dict>
+</plist>

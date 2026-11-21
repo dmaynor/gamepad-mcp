@@ -100,7 +100,11 @@ curl -X POST localhost:8771/command -d '{"mode": "stop"}'
 Its one skill is GTA navigation: crop the minimap, find the teal
 waypoint pin, steer the left stick by the pin's bearing (the minimap is
 player-up, so the bearing is relative to the character's facing; the
-stick is steered incrementally, no world frame needed). `forward` mode
+stick is steered incrementally, no world frame needed). Steering turns
+at most one 45° cell per tick — the first live test (2026-11-21)
+showed full-error steering spinning the stick through all 8
+directions — and a large bearing that stops closing for ~4 s stops
+the driver as *stuck* instead of grinding against a wall. `forward` mode
 just walks ahead. Commands carry a TTL and auto-stop; losing the pin
 for ~3 s stops too; every stop calls `release_all`. Each tick is
 logged as JSONL, and `--save-frames` also writes the frame per tick —
