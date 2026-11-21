@@ -48,6 +48,13 @@ gamepad-mcp --http --host 100.x.y.z --port 8765 --token <secret>
 
 # dry-run anywhere (records events instead of posting them)
 gamepad-mcp --backend null
+
+# public mode — when the terminal might be screenshotted or streamed:
+# IPv4 addresses in the log output are masked (every octet but the last
+# becomes X's, ports stay readable), e.g. uvicorn reports
+# http://XXX.XXX.XXX.21:8765. Display-only; the bind is unchanged.
+# Also settable as GAMEPAD_PUBLIC=1.
+gamepad-mcp --http --host 100.x.y.z --port 8765 --token <secret> --public
 ```
 
 An optional launchd agent lives in `launchd/com.gamepadmcp.server.plist`.

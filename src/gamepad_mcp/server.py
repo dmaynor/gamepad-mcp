@@ -6,14 +6,22 @@ Transports:
                                (e.g. a Tailscale IP) and set --token.
 
 Config via flags or environment: GAMEPAD_PROFILE, GAMEPAD_BACKEND,
-GAMEPAD_TOKEN, GAMEPAD_MAX_HOLD_MS.
+GAMEPAD_TOKEN, GAMEPAD_MAX_HOLD_MS, GAMEPAD_PUBLIC.
+
+Public mode (--public / GAMEPAD_PUBLIC=1) masks IPv4 addresses in the
+server's log output — every octet except the last is X'd out, ports are
+left readable — so terminal screenshots and streams are safe to share.
+It is display-only: the server still binds the real address.
 """
 
 from __future__ import annotations
 
 import argparse
 import atexit
+import copy
+import logging
 import os
+import re
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
@@ -21,6 +29,45 @@ from mcp.server.transport_security import TransportSecuritySettings
 from .backends import make_backend
 from .controller import Controller
 from .keymaps import list_profiles, load_profile
+
+_IPV4_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
+
+
+def mask_ips(text: str) -> str:
+    """X out the numerals of every IPv4 address in text, except the last
+    octet: 100.115.147.21 -> XXX.XXX.XXX.21. A following :port is not part
+    of the match and stays readable."""
+    def _mask(match: re.Match) -> str:
+        octets = match.group(0).split(".")
+        return ".".join("X" * len(o) for o in octets[:3]) + "." + octets[3]
+
+    return _IPV4_RE.sub(_mask, text)
+
+
+class PublicIPMaskFilter(logging.Filter):
+    """Logging filter for public mode: rewrites each record's message
+    through mask_ips before it is formatted."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        masked = mask_ips(record.getMessage())
+        if masked != record.getMessage():
+            record.msg = masked
+            record.args = ()
+        return True
+
+
+def public_log_config() -> dict:
+    """uvicorn's default log config with PublicIPMaskFilter attached to
+    both handlers (startup/error and access logs)."""
+    from uvicorn.config import LOGGING_CONFIG
+
+    config = copy.deepcopy(LOGGING_CONFIG)
+    config.setdefault("filters", {})["public_ip"] = {
+        "()": "gamepad_mcp.server.PublicIPMaskFilter"
+    }
+    for handler in config.get("handlers", {}).values():
+        handler.setdefault("filters", []).append("public_ip")
+    return config
 
 _controller: Controller | None = None
 
@@ -121,6 +168,12 @@ def main() -> None:
     parser.add_argument("--profile", default=None)
     parser.add_argument("--backend", default=None,
                         help="'auto', 'macos', or 'null' (dry-run)")
+    parser.add_argument("--public", action="store_true",
+                        default=os.environ.get("GAMEPAD_PUBLIC") == "1",
+                        help="mask IPv4 addresses in log output (all octets "
+                             "but the last become X's; ports stay readable) "
+                             "so screenshots are safe to share; display-only, "
+                             "the bind address is unchanged")
     args = parser.parse_args()
 
     if args.profile:
@@ -158,7 +211,11 @@ def main() -> None:
         app.add_middleware(BearerAuth)
     import uvicorn
 
-    uvicorn.run(app, host=args.host, port=args.port)
+    if args.public:
+        uvicorn.run(app, host=args.host, port=args.port,
+                    log_config=public_log_config())
+    else:
+        uvicorn.run(app, host=args.host, port=args.port)
 
 
 if __name__ == "__main__":
