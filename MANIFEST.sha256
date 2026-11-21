@@ -1,8 +1,8 @@
-# gamepad-mcp 0.1.2 source-tree manifest — 2026-11-21T15:54:03Z
-# MANIFEST.sha256 itself is not listed (self-reference). Regenerated for the GitHub push; README doc fixes after the 0.1.2 tarball are included, code is unchanged from 0.1.2.
+# gamepad-mcp 0.1.2 source-tree manifest — 2026-11-21T16:31:59Z
+# MANIFEST.sha256 itself is not listed (self-reference). Regenerated for the GitHub push; README operational docs (Chiaki-UCR setup/launch recipe, focus law, known issues) added after the 0.1.2 tarball are included, code is unchanged from 0.1.2.
 a08e720265df6994b0c479ae4802efd79a4cef78ef8da79f97537cbbc23e9d0e       59  .gitignore
 cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30    11358  LICENSE
-598a42dc0e51cac81744a7eda1aa777b320edd5b34f0070b21ace9895bf26f6b     4298  README.md
+c189ab782bb058af77e231aa5f15700a98609ca13b84582bed3b3082479fc8b6     8261  README.md
 0eef7ddb41fe54a1327be384dbcb0eddcc7234b4a1de595ba8e8c8924b7baad4     1905  install.sh
 1c4130e87f7cff93b966cd894c9730199079f558108b90d81177dc4ff3d85ed8      754  keymaps/chiaki-ng.json
 402a8da3e1c8c7140d898bfbd9a4149c636a513cd976dae94d4b25b6ecae71ac     1156  launchd/com.gamepadmcp.server.plist

@@ -82,6 +82,15 @@ MCP client config (stdio):
   addresses only. This server *is* remote control of a keyboard — treat the
   token like a password.
 
+## Where the input lands
+
+HID events go to the **frontmost app**, full stop. If another app (OBS, a
+browser, anything) takes frontmost status, the server still accepts calls
+and returns success — the game just never sees the keys. The signature is
+unmistakable once you've seen it: tool calls succeed, `status` shows
+`held: []`, and the character doesn't move. Recovery is to give the game
+window input focus again — for a Chiaki stream, click inside the video.
+
 ## Keymap profiles
 
 Profiles are JSON: DualSense names → key names. See
@@ -92,12 +101,95 @@ stick bindings **unbound**: bind Left Stick to W/A/S/D and Right Stick to
 I/J/K/L in Chiaki's Settings → Keys first, or `hold_stick` will do nothing.
 Drop your own profiles in `~/.config/gamepad-mcp/keymaps/`.
 
+## Playing a console through Chiaki-UCR
+
+[Chiaki-UCR](https://github.com/ChrystianLozano/ChiakiUCR) injects a plugin
+(`libchiaki_ucr.dylib`) into chiaki-ng that presents a virtual DualSense to
+the console and maps keyboard/mouse input to it. gamepad-mcp drives the
+keyboard side, so the chain is agent → HID keys → UCR → virtual DualSense →
+console. Two one-time setup steps and one launch order make it work;
+skipping any of them fails silently.
+
+### One-time setup: let the plugin load
+
+chiaki-ng 1.10.1's executable is hardened-runtime signed (CodeDirectory
+flags `0x10000`) with only `audio-input` and `allow-jit` entitlements.
+UCR's dylib is ad-hoc signed, and without `disable-library-validation`
+macOS silently refuses to load it — UCR looks fine and does nothing.
+Re-sign chiaki-ng ad-hoc with an entitlements file
+(`~/chiaki-entitlements.plist`):
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+	<key>com.apple.security.cs.allow-jit</key>
+	<true/>
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+</dict>
+</plist>
+```
+
+```sh
+codesign --force --deep --sign - --entitlements ~/chiaki-entitlements.plist /Applications/chiaki-ng.app
+```
+
+Reinstalling or upgrading chiaki-ng restores the notarized signature —
+re-run the re-sign or UCR stops working again.
+
+### One-time setup: Input Monitoring
+
+Grant **Input Monitoring** (System Settings → Privacy & Security → Input
+Monitoring) to **both** chiaki-ng and Chiaki-UCR. The plugin's keyboard
+event tap lives in chiaki-ng's process, so chiaki-ng's grant is the one
+that makes keys flow.
+
+### Launch recipe (verified)
+
+1. Start from a clean slate, Tailscale up.
+2. Start the gamepad-mcp server in Terminal.
+3. Open Chiaki-UCR and **select the game's profile**. The selection does
+   not persist across reboots — it defaults to Arc Raiders.
+4. Launch chiaki-ng from UCR ("Abrir chiaki-ng con UCR"). Never launch
+   chiaki-ng directly: a plain running instance blocks the injected one
+   through chiaki-ng's single-instance hand-off.
+5. In chiaki-ng's control plane, double-click the console card to start
+   the stream.
+6. Click inside the stream video to give it input focus.
+7. Play.
+
+### When it misbehaves
+
+- **Stream dropped.** chiaki-ng falls back to its control plane (host
+  list; the console shows "State: ready"). The game session persists on
+  the console itself — double-click the console card to reconnect. A click
+  can report a partial-dispatch error and still have worked; verify by
+  the stream actually starting.
+- **The stick readout lies.** UCR's on-screen stick telemetry can read
+  +0.00/+0.00 mid-hold while input is working fine. Verify movement by
+  watching the character or scene actually move, never by the readout
+  alone.
+- **Mouse-look is unproven.** `mouse_move` takes absolute screen
+  coordinates, and UCR's F8 mouse capture did not pan the in-game camera
+  in testing — an absolute warp moved the macOS cursor only. Sticks are
+  the proven path.
+
 ## Status
 
 v0.1.2. The controller, keymaps, and MCP protocol are covered by tests that
 run anywhere (`pip install -e ".[test]" && pytest`). The macOS event backend
 is exercised on a real Mac; off-Mac it stays behind the backend interface,
 with the null backend standing in.
+
+Known issue: the server process has died unexpectedly (twice in one
+morning; the port stops answering entirely and clients get an empty
+reply). Cause not yet captured — restart with the same command. Every
+restart changes the MCP session id, so HTTP clients must re-run
+`initialize` and capture the new `mcp-session-id` header.
 
 ## License
 
