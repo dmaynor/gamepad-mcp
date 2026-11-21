@@ -16,6 +16,7 @@ import atexit
 import os
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 from .backends import make_backend
 from .controller import Controller
@@ -134,6 +135,15 @@ def main() -> None:
 
     server.settings.host = args.host
     server.settings.port = args.port
+    # FastMCP's default DNS-rebinding protection builds an allowlist of
+    # localhost Host headers only; bound to any other address (e.g. a
+    # Tailscale IP) it rejects EVERY request with 421 "Invalid Host
+    # header" (verified live 2026-11-21). Access control here is the
+    # bearer token plus the private-network bind, so the browser
+    # threat model the check defends against does not apply.
+    server.settings.transport_security = TransportSecuritySettings(
+        enable_dns_rebinding_protection=False
+    )
     app = server.streamable_http_app()
     if args.token:
         from starlette.middleware.base import BaseHTTPMiddleware
