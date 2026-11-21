@@ -31,7 +31,9 @@ macOS gates behind Accessibility trust:
 
 1. Start the server once (below).
 2. System Settings → Privacy & Security → Accessibility → enable the
-   terminal/python entry running gamepad-mcp.
+   terminal/python entry running gamepad-mcp. (On macOS 27 this list lives
+   under Privacy & Security → **Device Control and Data Access** instead.)
+   The grant only latches after the server process restarts.
 3. Call the `status` tool: `"trusted": true` means you're ready.
 
 ## Run
@@ -84,14 +86,15 @@ MCP client config (stdio):
 
 Profiles are JSON: DualSense names → key names. See
 [`keymaps/chiaki-ng.json`](keymaps/chiaki-ng.json) — its button map was read
-live from Chiaki's Settings → Keys against a PS5; the stick entries are
-Chiaki's conventional WASD/IJKL defaults (the captured Settings grid didn't
-show stick rows, so verify them in your build and edit the file if yours
-differ). Drop your own profiles in `~/.config/gamepad-mcp/keymaps/`.
+live from Chiaki's Settings → Keys against a PS5 and verified in game.
+The stick entries assume WASD (left) / IJKL (right), but Chiaki ships its
+stick bindings **unbound**: bind Left Stick to W/A/S/D and Right Stick to
+I/J/K/L in Chiaki's Settings → Keys first, or `hold_stick` will do nothing.
+Drop your own profiles in `~/.config/gamepad-mcp/keymaps/`.
 
 ## Status
 
-v0.1.0. The controller, keymaps, and MCP protocol are covered by tests that
+v0.1.2. The controller, keymaps, and MCP protocol are covered by tests that
 run anywhere (`pip install -e ".[test]" && pytest`). The macOS event backend
 is exercised on a real Mac; off-Mac it stays behind the backend interface,
 with the null backend standing in.
