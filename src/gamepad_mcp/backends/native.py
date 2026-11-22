@@ -12,6 +12,16 @@ into the current state. The Controller's keymap profiles remain a
 translation layer above this; a native deployment maps tool buttons
 to button names 1:1. Mouse methods raise UnsupportedStateError —
 a console has no mouse, and a typed refusal beats a silent no-op.
+
+Session ownership is LAZY (M3): constructing this backend does not
+connect the client. The first state hand-off connects, and a refusal
+(the console's one Remote Play session is held by the §4.10 panel,
+or the console is unreachable) raises the client's typed error from
+that call — so an MCP server on this backend starts and serves
+cleanly while the console refuses sessions, and the refusal surfaces
+on the first tool call, never as a hang or a fake success. This
+server and the panel are ALTERNATIVE session owners: never
+connected simultaneously.
 """
 
 from __future__ import annotations
@@ -32,11 +42,32 @@ class NativeBackend(InputBackend):
         self.name = f"native-{client.name}"
         self._state = ControllerState.neutral()
 
+    @property
+    def current_state(self) -> ControllerState:
+        """The last state handed to the client (neutral until then)."""
+        return self._state
+
     # -- state API ------------------------------------------------------
     def supports_state(self) -> bool:
         return True
 
+    def note_disconnected(self) -> None:
+        """Forget the tracked state: after a disconnect the console
+        holds nothing of ours (the client's disconnect sends neutral
+        before the session goes down)."""
+        self._state = ControllerState.neutral()
+
+    def ensure_connected(self) -> None:
+        """Connect the client if it has no live session (lazy session
+        ownership, see the module docstring). A refusal raises the
+        client's typed error verbatim — SessionDownError when the
+        console's session is held elsewhere, ConsoleUnreachableError
+        when it does not answer at all."""
+        if not self.client.connected:
+            self.client.connect()
+
     def set_state(self, state: ControllerState, why: str = "") -> InputAck:
+        self.ensure_connected()
         ack = self.client.send_state(state, why=why)
         self._state = state
         return ack
