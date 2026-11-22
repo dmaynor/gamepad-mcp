@@ -34,7 +34,7 @@ from .base import RemotePlayClient
 from .errors import ClientError
 from .log import MoveLogger, describe_input
 from .sources import ManualSource, StatePump
-from .state import ControllerState
+from .state import ControllerState, InputLogRecord
 
 
 class PanelService:
@@ -45,6 +45,7 @@ class PanelService:
         client: RemotePlayClient,
         logger: Optional[MoveLogger] = None,
         frame_dir: Optional[str] = None,
+        stall_threshold: float = 2.0,
     ):
         self.client = client
         self.logger = logger if logger is not None else MoveLogger()
@@ -59,10 +60,17 @@ class PanelService:
         self._frame_dir = Path(frame_dir) if frame_dir else Path(".")
         self._frame_stop = threading.Event()
         self._frame_thread: Optional[threading.Thread] = None
+        # D1: how old the newest frame may get before the surface
+        # must call it stale — disclosed in status, logged once per
+        # episode, never presented as live.
+        self.stall_threshold = stall_threshold
+        self._pump_started_ts: float = 0.0
+        self._stall_logged = False
 
     # -- frames -------------------------------------------------------
     def start_frames(self, interval: float = 0.2) -> None:
         self._frame_stop.clear()
+        self._pump_started_ts = time.time()
         self._frame_thread = threading.Thread(
             target=self._frame_loop, args=(interval,), daemon=True
         )
@@ -81,6 +89,7 @@ class PanelService:
                     self._frame_jpeg = jpeg
                     self._frame_ts = result.captured_ts
                     self._frame_error = ""
+                    self._stall_logged = False
             except Exception as exc:  # frame path reports, never dies
                 with self._frame_lock:
                     self._frame_error = f"{type(exc).__name__}: {exc}"
@@ -95,9 +104,53 @@ class PanelService:
             img.convert("RGB").save(buf, format="JPEG", quality=65)
         return buf.getvalue()
 
+    # -- frame freshness (D1: a frozen frame is never "live") --------
+    def _frame_age(self) -> Optional[float]:
+        with self._frame_lock:
+            ts = self._frame_ts
+        if ts:
+            return max(0.0, time.time() - ts)
+        if self._pump_started_ts:
+            return max(0.0, time.time() - self._pump_started_ts)
+        return None
+
+    def _surface_stall(self) -> Optional[str]:
+        """The stall message if frames are stale, else None.
+
+        Computed on the status/frame read path — HTTP handler
+        threads — so the disclosure happens even when the pump
+        thread itself is the thing that is wedged (exactly the D1
+        failure shape). The first crossing per stall episode is
+        written to the MoveLogger as a FAILED record; a fresh frame
+        ends the episode (the pump clears the flag on success).
+        """
+        age = self._frame_age()
+        if age is None or age <= self.stall_threshold:
+            return None
+        message = (
+            f"FrameStallError: no new frame for {age:.1f} s "
+            f"(stall bound {self.stall_threshold:.1f} s)"
+        )
+        with self._frame_lock:
+            already = self._stall_logged
+            self._stall_logged = True
+        if not already:
+            self.logger.log(
+                InputLogRecord.now(
+                    input={"tool": "frame_pump"},
+                    why="panel frame freshness watchdog",
+                    result=f"FAILED: {message}",
+                    outcome="failed",
+                )
+            )
+        return message
+
     def frame(self) -> tuple[Optional[bytes], float, str]:
         with self._frame_lock:
-            return self._frame_jpeg, self._frame_ts, self._frame_error
+            jpeg, ts, error = self._frame_jpeg, self._frame_ts, self._frame_error
+        if not error:
+            error = self._surface_stall() or ""
+        return jpeg, ts, error
 
     # -- input ----------------------------------------------------------
     def post_state(self, payload: dict) -> dict:
@@ -140,13 +193,19 @@ class PanelService:
         negotiated = getattr(self.client, "negotiated_profile", None)
         if callable(negotiated):
             profile = negotiated()
+        stall = self._surface_stall()
+        age = self._frame_age()
+        with self._frame_lock:
+            error = self._frame_error
         return {
             "client": self.client.name,
             "console": self.client.console,
             "connected": bool(self.client.connected),
             "profile": profile,
             "frame_ts": self._frame_ts,
-            "frame_error": self._frame_error,
+            "frame_age_s": (round(age, 2) if age is not None else None),
+            "frame_stale": stall is not None,
+            "frame_error": error or (stall or ""),
         }
 
     def log_records(self, limit: int = 30) -> list:
@@ -309,6 +368,7 @@ async function refreshStatus() {
     const p = j.profile ? ` · ${j.profile.width}x${j.profile.height}@${j.profile.max_fps} ${j.profile.codec}` : '';
     document.getElementById('status').textContent =
       `${j.client} · ${j.console} · ${j.connected ? 'connected' : 'NOT CONNECTED'}${p}` +
+      (j.frame_stale ? ' · FRAME STALE ' + j.frame_age_s + 's' : '') +
       (j.frame_error ? ' · frame: ' + j.frame_error : '');
   } catch (e) { /* next tick */ }
 }
@@ -389,6 +449,51 @@ def serve(
     return server
 
 
+def install_shutdown_handlers(server: ThreadingHTTPServer) -> None:
+    """Make SIGINT and SIGTERM stop the panel gracefully (D2).
+
+    A panel launched in the background (nohup over ssh, as the
+    rehearsal runs it) inherits SIGINT set to SIG_IGN — a shell
+    launching an async job without job control does that — and
+    Python preserves an inherited ignore, so Ctrl-C and kill -INT
+    did nothing at all: the M2 rehearsal had to SIGTERM the walk
+    surface, skipping the graceful stop and dropping the console
+    session abruptly. Installing explicit handlers overrides the
+    inherited disposition in every launch mode.
+
+    shutdown() runs on a helper thread: HTTPServer.shutdown() must
+    be called from a thread other than serve_forever()'s, and a
+    signal lands in the main thread — the serve_forever() thread
+    here. Must be called from the main thread (signal rules).
+    """
+    import signal
+
+    def _handler(signum, _frame):
+        threading.Thread(target=server.shutdown, daemon=True).start()
+
+    signal.signal(signal.SIGINT, _handler)
+    signal.signal(signal.SIGTERM, _handler)
+
+
+def serve_until_signal(service: PanelService, server: ThreadingHTTPServer) -> int:
+    """serve_forever() plus the graceful stop, however the serve ends:
+    stop the frame pump, release all input (dead-man rule),
+    disconnect the client, close the server."""
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        service.stop_frames()
+        try:
+            service.release()
+        except Exception:
+            pass
+        service.client.disconnect()
+        server.server_close()
+    return 0
+
+
 def main(argv=None) -> int:
     import argparse
     import os
@@ -411,20 +516,9 @@ def main(argv=None) -> int:
     client.connect()
     service.start_frames()
     server = serve(service, args.host, args.port)
+    install_shutdown_handlers(server)
     print(f"panel serving on http://{args.host}:{args.port}/ (client {client.name})", flush=True)
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        service.stop_frames()
-        try:
-            service.release()
-        except Exception:
-            pass
-        client.disconnect()
-        server.server_close()
-    return 0
+    return serve_until_signal(service, server)
 
 
 if __name__ == "__main__":

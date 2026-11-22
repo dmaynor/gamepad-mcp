@@ -41,6 +41,18 @@ class FrameGrabError(ClientError):
     """No decoded frame was available to capture."""
 
 
+class FrameStallError(ClientError):
+    """Frames stopped arriving: the newest frame is older than the
+    stall bound, or none has ever arrived.
+
+    Named separately from FrameGrabError because the panel's original
+    sin (defect D1, 2026-11-21) was presenting a frozen frame as live:
+    a stall is a *state a surface must disclose*, not a single failed
+    capture. The panel raises this condition into its status and its
+    log after a bounded stall — never silence.
+    """
+
+
 class UnsupportedStateError(ClientError):
     """A backend was asked for state-based input it does not implement.
 

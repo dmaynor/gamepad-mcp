@@ -13,6 +13,7 @@ from .errors import (
     ConsoleAsleepError,
     ConsoleUnreachableError,
     FrameGrabError,
+    FrameStallError,
     InputChannelError,
     NotConnectedError,
     PadUnavailableError,
@@ -21,7 +22,8 @@ from .errors import (
     UnsupportedStateError,
 )
 from .log import MoveLogger
-from .panel import PanelService, serve as serve_panel
+from .panel import PanelService, install_shutdown_handlers
+from .panel import serve as serve_panel
 from .sources import (
     HidPadReader,
     InputSource,
@@ -45,6 +47,7 @@ __all__ = [
     "MoveLogger",
     "PanelService",
     "serve_panel",
+    "install_shutdown_handlers",
     "InputSource",
     "ManualSource",
     "PadSource",
@@ -60,6 +63,7 @@ __all__ = [
     "ConsoleAsleepError",
     "ConsoleUnreachableError",
     "FrameGrabError",
+    "FrameStallError",
     "InputChannelError",
     "NotConnectedError",
     "PadUnavailableError",

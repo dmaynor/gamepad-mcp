@@ -12,9 +12,16 @@ our own code on the mini. M2 adds the rest of the contract:
   record and raises a typed error (PRD §4.4: no silent inputs).
 - ``wake`` sends the discovery wakeup packet and polls until the
   console reports Ready (PRD §4.1).
-- ``connect`` negotiates the 1080p60 local profile explicitly and
+- ``connect`` requests 1080p60 on both the library's local and
+  remote profile presets (defect D4: this connection is governed
+  by the *remote* profile — sessions negotiated its 720p default
+  while only the already-1080p local preset was being set), and
   ``negotiated_profile()`` reports what the console actually agreed
   to — the verified number, not the request.
+- ``grab_frame`` pulls decoded frames from the session's frame
+  handler under a bounded deadline — never the ``session.frames()``
+  event iterator, whose unbounded wait wedged the panel's frame
+  pump permanently and silently (defect D1).
 
 Axis convention (verified live in the M2 rehearsal, BUILDLOG-M2):
 ControllerState axes are libchiaki's — -1.0 is stick fully up/left,
@@ -215,10 +222,22 @@ class PsClient(RemotePlayClient):
         chiaki_py = self._lib()
         reg = self._registration()
         settings = chiaki_py.lib.Settings()
+        # D4 (BUILDLOG-M2R/M2F): the library governs this connection
+        # with its REMOTE video profile — every session negotiated
+        # the remote default (1280x720@60, bitrate 10000, verified
+        # against Settings.get_video_profile_remote_ps5()) while the
+        # code set only the local preset, which already defaults to
+        # 1080p and changed nothing. Set both presets so the request
+        # is identical whichever the library applies;
+        # negotiated_profile() remains the truth about the answer.
         settings.set_resolution_local_ps5(
             chiaki_py.lib.VideoResolutionPreset.Resolution1080p
         )
+        settings.set_resolution_remote_ps5(
+            chiaki_py.lib.VideoResolutionPreset.Resolution1080p
+        )
         settings.set_fpslocal_ps5(chiaki_py.lib.VideoFPSPreset.FPS60)
+        settings.set_fpsremote_ps5(chiaki_py.lib.VideoFPSPreset.FPS60)
         session = chiaki_py.Session(reg, settings=settings)
         try:
             session.connect()
@@ -247,7 +266,15 @@ class PsClient(RemotePlayClient):
         return self._session is not None and bool(self._session.is_active)
 
     def negotiated_profile(self) -> Optional[dict]:
-        """The video profile the console actually negotiated."""
+        """The video profile the console actually negotiated.
+
+        This reading is the record, never the request (D4): through
+        the M2 rehearsal it reported 1280x720@60/bitrate 10000 —
+        the library's remote-profile default — while connect() was
+        requesting 1080p on the local preset only. If a future
+        reading disagrees with the request in connect(), the
+        disagreement is reported, not smoothed over.
+        """
         if self._session is None:
             return None
         try:
@@ -263,14 +290,45 @@ class PsClient(RemotePlayClient):
         }
 
     # -- frames -----------------------------------------------------------
-    def grab_frame(self, path: str) -> FrameResult:
+    def grab_frame(self, path: str, timeout: float = 2.0) -> FrameResult:
+        """Capture one decoded frame, waiting at most ``timeout``.
+
+        Pulls from the session's frame handler directly
+        (``CpuFrameHandler.get_frame()``: the next decoded frame, or
+        None if none is available yet) and polls it under a bounded
+        deadline. This path cannot wedge: worst case it raises
+        FrameGrabError at the deadline — typed, never silent.
+
+        The previous implementation took ``next(iter(session
+        .frames()))`` — a fresh event subscription per grab, waited
+        on with no timeout. At the panel pump's 0.2 s cadence the
+        frame event stopped arriving after ~2 grabs and the wait
+        blocked forever: no exception, no error, a frozen frame
+        served as live (defect D1, BUILDLOG-M2R/M2F). Direct grabs
+        at ~1 s cadence never tripped it, which is why M1/M2's
+        proofs passed while the pump died.
+        """
         self._require_connected()
-        try:
-            frame = next(iter(self._session.frames()))
-        except Exception as exc:
-            raise FrameGrabError(
-                f"no frame from session ({type(exc).__name__}): {exc}"
-            ) from exc
+        handler = self._session.frame_handler
+        deadline = time.monotonic() + timeout
+        frame = None
+        while frame is None:
+            try:
+                frame = handler.get_frame()
+            except RuntimeError:
+                # One unreadable frame: drop it and keep polling
+                # (the library's own iterator does the same).
+                frame = None
+            except Exception as exc:
+                raise FrameGrabError(
+                    f"frame pull failed ({type(exc).__name__}): {exc}"
+                ) from exc
+            if frame is None:
+                if time.monotonic() >= deadline:
+                    raise FrameGrabError(
+                        f"no decoded frame within {timeout:.1f} s"
+                    )
+                time.sleep(0.005)
         try:
             from PIL import Image
         except ImportError as exc:
