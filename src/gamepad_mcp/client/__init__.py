@@ -15,12 +15,21 @@ from .errors import (
     FrameGrabError,
     InputChannelError,
     NotConnectedError,
+    PadUnavailableError,
     RegistrationError,
     SessionDownError,
     UnsupportedStateError,
 )
 from .log import MoveLogger
-from .sources import InputSource, ManualSource, StatePump
+from .panel import PanelService, serve as serve_panel
+from .sources import (
+    HidPadReader,
+    InputSource,
+    ManualSource,
+    PadSource,
+    StatePump,
+    parse_pad_report,
+)
 from .state import (
     BUTTONS,
     ControllerState,
@@ -34,8 +43,13 @@ __all__ = [
     "RemotePlayClient",
     "StubClient",
     "MoveLogger",
+    "PanelService",
+    "serve_panel",
     "InputSource",
     "ManualSource",
+    "PadSource",
+    "HidPadReader",
+    "parse_pad_report",
     "StatePump",
     "ControllerState",
     "FrameResult",
@@ -48,6 +62,7 @@ __all__ = [
     "FrameGrabError",
     "InputChannelError",
     "NotConnectedError",
+    "PadUnavailableError",
     "RegistrationError",
     "SessionDownError",
     "UnsupportedStateError",

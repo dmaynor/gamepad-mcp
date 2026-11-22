@@ -239,15 +239,17 @@ def test_pump_propagates_typed_errors():
         pump.step()
 
 
-def test_ps_client_input_is_typed_refusal_until_m2(tmp_path):
-    # PsClient ships in M1 with connect+frames proven live; its input
-    # path must refuse typed-and-logged, never silently (PRD §4.4).
+def test_ps_client_input_without_session_is_typed_refusal(tmp_path):
+    # M1 asserted the pre-M2 refusal (InputChannelError: "lands in
+    # M2"). M2 made input real; with no live session the refusal is
+    # NotConnectedError — still typed-and-logged, never silent (§4.4).
+    from gamepad_mcp.client import NotConnectedError
     from gamepad_mcp.client.ps import PsClient
 
     client = PsClient(plist_path=tmp_path / "absent.plist")
     logger = MoveLogger()
     client.set_log_sink(logger)
-    with pytest.raises(InputChannelError):
+    with pytest.raises(NotConnectedError):
         client.send_state(ControllerState(buttons={"cross"}), why="walk test")
     assert logger.records[-1].outcome == "failed"
 

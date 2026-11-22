@@ -51,3 +51,12 @@ class UnsupportedStateError(ClientError):
 
 class RegistrationError(ClientError):
     """Pairing/registration material is missing or was rejected."""
+
+
+class PadUnavailableError(ClientError):
+    """No supported physical gamepad is available to a pad source.
+
+    Raised typed (PRD §4.4's spirit applied to sources): an unpaired
+    or unplugged controller is a named condition, not a silent
+    neutral state that would look like a player choosing to idle.
+    """
