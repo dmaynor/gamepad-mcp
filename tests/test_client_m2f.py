@@ -171,11 +171,13 @@ def test_panel_dead_grab_surfaces_error_and_stall():
         service.stop_frames()
 
 
-def test_panel_fresh_frames_are_not_stale():
+def test_panel_fresh_frames_are_not_stale(tmp_path):
     logger = MoveLogger()
     client = StubClient()
     client.connect()
-    service = PanelService(client, logger=logger, stall_threshold=1.0)
+    service = PanelService(
+        client, logger=logger, frame_dir=str(tmp_path), stall_threshold=1.0
+    )
     service.start_frames(interval=0.05)
     try:
         assert _wait_for(lambda: service.frame()[0] is not None)
