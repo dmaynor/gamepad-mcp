@@ -40,70 +40,97 @@ pytest.importorskip("PIL")
 
 
 # ---------------------------------------------------------------------
-# D1a: PsClient.grab_frame is a bounded poll of the frame handler
+# D1a: PsClient frames come from ONE persistent iterator, owned by a
+# pump thread; grab_frame reads the newest slot under a deadline.
+# (Per-grab iterators wedged the event; bare get_frame() polling
+# starved after one buffered frame — both proven live, BUILDLOG-M2F.)
 # ---------------------------------------------------------------------
-
-
-class FakeHandler:
-    """get_frame() returns queued results, then None forever."""
-
-    def __init__(self, results):
-        self._results = list(results)
-        self.calls = 0
-
-    def get_frame(self, out=None):
-        self.calls += 1
-        if self._results:
-            result = self._results.pop(0)
-            if isinstance(result, Exception):
-                raise result
-            return result
-        return None
-
-
-class FakeFrameSession:
-    def __init__(self, handler):
-        self.frame_handler = handler
-        self.is_active = True
-
-    def frames(self):  # the D1 path: must never be used again
-        raise AssertionError("grab_frame used the event-iterator path")
-
-
-def _ps_with_handler(handler):
-    client = PsClient()
-    client._session = FakeFrameSession(handler)
-    return client
 
 
 def _frame(value=7):
     return np.full((4, 5, 3), value, dtype=np.uint8)
 
 
-def test_grab_frame_polls_until_frame_arrives(tmp_path):
-    handler = FakeHandler([None, None, _frame()])
-    client = _ps_with_handler(handler)
+class FakeFrameSession:
+    """frames() returns a fresh iterator from the given factory and
+    counts the calls; get_frame() must never be used."""
+
+    def __init__(self, factory):
+        self._factory = factory
+        self.is_active = True
+        self.frames_calls = 0
+
+    def frames(self, max_fps=60.0):
+        self.frames_calls += 1
+        return self._factory()
+
+    @property
+    def frame_handler(self):
+        raise AssertionError("grab path used frame_handler.get_frame()")
+
+
+def _ps_with_frames(factory):
+    client = PsClient()
+    client._session = FakeFrameSession(factory)
+    client._start_frame_pump()
+    return client
+
+
+def _wait_until(predicate, timeout=3.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return True
+        time.sleep(0.02)
+    return predicate()
+
+
+def test_grab_frame_reads_pumped_frame(tmp_path):
+    client = _ps_with_frames(lambda: iter([_frame(7)]))
     out = str(tmp_path / "f.png")
     result = client.grab_frame(out, timeout=2.0)
-    assert handler.calls == 3
     assert (result.width, result.height) == (5, 4)
     assert os.path.getsize(out) > 0
+    # one persistent iterator across grabs — not one per grab (D1)
+    client.grab_frame(out, timeout=2.0)
+    assert client._session.frames_calls == 1
 
 
-def test_grab_frame_drops_unreadable_frames(tmp_path):
-    handler = FakeHandler([RuntimeError("bad frame"), _frame()])
-    client = _ps_with_handler(handler)
+def test_grab_frame_waits_for_first_frame(tmp_path):
+    def gen():
+        time.sleep(0.3)
+        yield _frame(9)
+
+    client = _ps_with_frames(lambda: gen())
+    t0 = time.monotonic()
     result = client.grab_frame(str(tmp_path / "f.png"), timeout=2.0)
     assert result.width == 5
+    assert time.monotonic() - t0 >= 0.25
 
 
 def test_grab_frame_deadline_is_typed_never_a_hang(tmp_path):
-    handler = FakeHandler([])
-    client = _ps_with_handler(handler)
+    never = threading.Event()
+
+    def gen():
+        never.wait()
+        yield _frame()  # pragma: no cover - never reached
+
+    client = _ps_with_frames(lambda: gen())
     t0 = time.monotonic()
     with pytest.raises(FrameGrabError):
         client.grab_frame(str(tmp_path / "f.png"), timeout=0.3)
     assert time.monotonic() - t0 < 2.0
+
+
+def test_grab_frame_source_failure_is_typed(tmp_path):
+    def gen():
+        raise RuntimeError("decoder died")
+        yield  # pragma: no cover - makes this a generator
+
+    client = _ps_with_frames(lambda: gen())
+    with pytest.raises(FrameGrabError) as excinfo:
+        client.grab_frame(str(tmp_path / "f.png"), timeout=2.0)
+    assert "decoder died" in str(excinfo.value)
 
 
 # ---------------------------------------------------------------------

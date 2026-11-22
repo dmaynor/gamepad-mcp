@@ -18,10 +18,12 @@ our own code on the mini. M2 adds the rest of the contract:
   while only the already-1080p local preset was being set), and
   ``negotiated_profile()`` reports what the console actually agreed
   to — the verified number, not the request.
-- ``grab_frame`` pulls decoded frames from the session's frame
-  handler under a bounded deadline — never the ``session.frames()``
-  event iterator, whose unbounded wait wedged the panel's frame
-  pump permanently and silently (defect D1).
+- ``grab_frame`` reads the newest frame from a per-session pump
+  thread that owns ONE persistent ``session.frames()`` iterator.
+  Both simpler paths are proven dead ends (defect D1): a fresh
+  iterator per grab wedged the frame event after ~2 grabs at pump
+  cadence, and polling ``frame_handler.get_frame()`` with no
+  subscription starved after the first buffered frame.
 
 Axis convention (verified live in the M2 rehearsal, BUILDLOG-M2):
 ControllerState axes are libchiaki's — -1.0 is stick fully up/left,
@@ -34,6 +36,7 @@ the host, held in memory, and never logged or printed.
 from __future__ import annotations
 
 import plistlib
+import threading
 import time
 from pathlib import Path
 from typing import Optional
@@ -129,6 +132,14 @@ class PsClient(RemotePlayClient):
         self.plist_path = Path(plist_path)
         self.host_index = host_index
         self._session = None
+        # Frame pump state (see grab_frame): one thread per session
+        # owns the frames() iterator and keeps the newest frame in
+        # this slot; _frame_error records why the pump died, if it did.
+        self._frame_cond = threading.Condition()
+        self._latest_frame: Optional[tuple] = None  # (array, time.time())
+        self._frame_error: Optional[str] = None
+        self._frame_stop = threading.Event()
+        self._frame_thread: Optional[threading.Thread] = None
 
     # -- internals ------------------------------------------------------
     @staticmethod
@@ -246,8 +257,10 @@ class PsClient(RemotePlayClient):
                 f"session connect failed ({type(exc).__name__}): {exc}"
             ) from exc
         self._session = session
+        self._start_frame_pump()
 
     def disconnect(self) -> None:
+        self._frame_stop.set()
         if self._session is not None:
             try:
                 # Dead-man rule (PRD §6): release everything before the
@@ -290,45 +303,81 @@ class PsClient(RemotePlayClient):
         }
 
     # -- frames -----------------------------------------------------------
+    def _start_frame_pump(self) -> None:
+        """(Re)start the per-session frame pump on the current session."""
+        with self._frame_cond:
+            self._latest_frame = None
+            self._frame_error = None
+        self._frame_stop.clear()
+        self._frame_thread = threading.Thread(
+            target=self._pump_frames, name="ps-frame-pump", daemon=True
+        )
+        self._frame_thread.start()
+
+    def _pump_frames(self) -> None:
+        """Own the session's ONE persistent frames() iterator.
+
+        Every decoded frame lands in the slot with its arrival time.
+        If the iterator ends or raises, the cause is recorded in
+        _frame_error and grab_frame callers raise it typed — the
+        pump dying is a disclosed state, never a silent freeze.
+        """
+        session = self._session
+        try:
+            for frame in session.frames():
+                if self._frame_stop.is_set():
+                    break
+                with self._frame_cond:
+                    self._latest_frame = (frame, time.time())
+                    self._frame_cond.notify_all()
+        except Exception as exc:
+            with self._frame_cond:
+                self._frame_error = f"{type(exc).__name__}: {exc}"
+                self._frame_cond.notify_all()
+
     def grab_frame(self, path: str, timeout: float = 2.0) -> FrameResult:
-        """Capture one decoded frame, waiting at most ``timeout``.
+        """Capture the newest decoded frame, waiting at most ``timeout``.
 
-        Pulls from the session's frame handler directly
-        (``CpuFrameHandler.get_frame()``: the next decoded frame, or
-        None if none is available yet) and polls it under a bounded
-        deadline. This path cannot wedge: worst case it raises
-        FrameGrabError at the deadline — typed, never silent.
+        Reads the pump thread's slot: returns the newest frame if it
+        is no older than ``timeout``, waits for a fresher one until
+        the deadline, then raises FrameGrabError. ``captured_ts`` is
+        when the frame arrived from the decoder, not when it was
+        read out — frame timestamps stay honest for latency work.
 
-        The previous implementation took ``next(iter(session
-        .frames()))`` — a fresh event subscription per grab, waited
-        on with no timeout. At the panel pump's 0.2 s cadence the
-        frame event stopped arriving after ~2 grabs and the wait
-        blocked forever: no exception, no error, a frozen frame
-        served as live (defect D1, BUILDLOG-M2R/M2F). Direct grabs
-        at ~1 s cadence never tripped it, which is why M1/M2's
-        proofs passed while the pump died.
+        Why a pump thread owns a persistent iterator (defect D1,
+        BUILDLOG-M2R/M2F — both simpler paths died live):
+        - ``next(iter(session.frames()))`` per grab (the original):
+          a fresh event subscription per call, waited on with no
+          timeout. At the panel's 0.2 s cadence the frame event
+          stopped arriving after ~2 grabs and the wait blocked
+          forever — no exception, a frozen frame served as live.
+        - Polling ``frame_handler.get_frame()`` with no subscription
+          (the first fix attempt): the handler delivered its one
+          buffered frame, then None forever — frames only flow
+          while the event machinery is engaged by an iterator.
+        The persistent iterator is the library's intended path; the
+        slot makes the caller's wait bounded whatever it does.
         """
         self._require_connected()
-        handler = self._session.frame_handler
         deadline = time.monotonic() + timeout
         frame = None
-        while frame is None:
-            try:
-                frame = handler.get_frame()
-            except RuntimeError:
-                # One unreadable frame: drop it and keep polling
-                # (the library's own iterator does the same).
-                frame = None
-            except Exception as exc:
-                raise FrameGrabError(
-                    f"frame pull failed ({type(exc).__name__}): {exc}"
-                ) from exc
-            if frame is None:
-                if time.monotonic() >= deadline:
+        captured_ts = 0.0
+        with self._frame_cond:
+            while True:
+                latest = self._latest_frame
+                if latest is not None and time.time() - latest[1] <= timeout:
+                    frame, captured_ts = latest
+                    break
+                if self._frame_error is not None:
+                    raise FrameGrabError(
+                        f"frame source failed: {self._frame_error}"
+                    )
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
                     raise FrameGrabError(
                         f"no decoded frame within {timeout:.1f} s"
                     )
-                time.sleep(0.005)
+                self._frame_cond.wait(timeout=min(remaining, 0.25))
         try:
             from PIL import Image
         except ImportError as exc:
@@ -336,7 +385,7 @@ class PsClient(RemotePlayClient):
         img = Image.fromarray(frame)
         img.save(path)
         return FrameResult(
-            path=path, captured_ts=time.time(), width=img.width, height=img.height
+            path=path, captured_ts=captured_ts, width=img.width, height=img.height
         )
 
     # -- input --------------------------------------------------------------
